@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 #from __future__ import print_function
+import re
+import traceback
 import rsyslog
 import unittest
 import os
@@ -10,6 +12,8 @@ class TestRsyslogPerformance:
     INPUT_FILE = "/tmp/rsyslog-testing/imfile"
     OUTPUT_FILE = "/tmp/rsyslog-testing/server.log"
     STATE_FILE = "/tmp/rsyslog-testing/imfile.state"
+    QUEUE = "/tmp/rsyslog-testing/srvrfwd.00000001"
+    QI = "/tmp/rsyslog-testing/srvrfwd.qi"
 
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
     SERVER_CONF = CURRENT_DIR + '/server2.conf'
@@ -23,6 +27,8 @@ class TestRsyslogPerformance:
         rsyslog.deleteIgnoreError(self.INPUT_FILE)
         rsyslog.deleteIgnoreError(self.OUTPUT_FILE)
         rsyslog.deleteIgnoreError(self.STATE_FILE)
+        rsyslog.deleteIgnoreError(self.QUEUE)
+        rsyslog.deleteIgnoreError(self.QI)
 
         self.input = open(self.INPUT_FILE, 'w+')
         self.output = open(self.OUTPUT_FILE, 'w+')
@@ -40,66 +46,62 @@ class TestRsyslogPerformance:
         self.server.stop()
 
     def queue(self, message):
-        print>>self.input, "(%d) %s" % (self.uid, message)
+        print>>self.input, "(uid:%d) %s" % (self.uid, message)
         self.uid = self.uid + 1
         self.input.flush()
 
 
-class PTmp(pyinotify.ProcessEvent):
-    received = 0
-    def __init__(self, filename):
-        self.filename = filename
-        self.fh = open(filename, 'r')
-
-    def process_IN_MODIFY(self, event):
-        print '!',
-        filename = os.path.join(event.path, event.name)
-        #print filename
-        if self.filename not in filename:
-            print '?',
-            return
-        else:
-            print '.',
-            print self.fh.readline().rstrip()
-            self.received = self.received + 1
-
-def setupNotifier(filename):
-    wm = pyinotify.WatchManager()
-    dirmask = pyinotify.IN_MODIFY
-    fh = open(filename, 'r')
-    index = filename.rfind('/')
-    fh.seek(0,2)
-    ptmp = PTmp(filename)
-    #notifier = pyinotify.ThreadedNotifier(wm, ptmp)
-    #notifier.start()
-    notifier = pyinotify.Notifier(wm, ptmp)
-    wm.add_watch(filename[:index], dirmask)
-    return (ptmp, notifier, fh)
-
 if __name__ == '__main__':
     benchmark = TestRsyslogPerformance()
-    notifier = None
     fh = None
+    SESSION = time.time()
+    DEBUG = False
+    count = 10000
+
+    print 'this session %d' % SESSION
     try:
-        count = 1000
         print "Benchmark setup with count %d" % count
         benchmark.setUp()
-        (ptmp, notifier, fh) = setupNotifier(benchmark.OUTPUT_FILE)
         for i in xrange(0, count):
-            print "%d" % i,
-            benchmark.queue('message')
+            #print "%d" % i,
+            benchmark.queue('session:%d' % SESSION)
+        print "Sent %d" % count
+        received = 0
+        fh = open(benchmark.OUTPUT_FILE, 'r')
 
-        while count > ptmp.received:
-            print '#%d' % ptmp.received,
-            print "processing events"
-            notifier.process_events()
-            if notifier.check_events():
-                 print "reading events"
-                 notifier.read_events()
+        start = time.time()
+        while count > received:
+            line = fh.readline().rstrip()
+
+            if len(line) > 0:
+                if DEBUG:
+                    print line
+                s = re.search("uid:(\d+)", line)
+                if s:
+                    uid = int(s.group(1))
+                    if DEBUG:
+                        print '#%d[%d]' % (received, uid),
+                    received = received + 1
+            try:
+                if benchmark.client.process.returncode:
+                    print 'client exited with %d' % benchmark.client.process.returncode
+                if benchmark.server.process.returncode:
+                    print 'client exited with %d' % benchmark.server.process.returncode
+                # must read otherwise pipe blows up
+                client = benchmark.client.process.stdout.readline()
+                server = benchmark.server.process.stdout.readline()
+                #print 'CLIENT:' + client,
+                #print 'SERVER:' + server,
+            except:
+                pass
+        delta = time.time() - start
+        per_thousand = (delta/count) * 1000
+        print "elapsed: %.3f s per_thousand:%.3f" % (delta, per_thousand)
     except Exception, e:
-        print e
+        print 'Main loop exception ', e
+        traceback.print_exc()
     finally:
         print 'cleaning up'
         benchmark.tearDown()
-        notifier.stop()
-        fh.close()
+        if fh:
+            fh.close()
