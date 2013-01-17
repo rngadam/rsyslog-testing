@@ -11,11 +11,11 @@ class Rsyslog:
             rsyslogd='/usr/sbin/rsyslogd'):
         self.configFilename = configFilename
         self.rsyslogd = rsyslogd
-        self.pid = '/tmp/' + os.path.basename(configFilename) + '.pid'
+        self.pid = '/tmp/rsyslog-testing/' + os.path.basename(configFilename) + '.pid'
         try:
             os.remove(self.pid)
-        except OSError:
-            pass
+        except OSError,e:
+            print e
         self.process = None
 
     def start(self):
@@ -84,6 +84,7 @@ def waitOutput(stream, str, timeout=5, echo=False):
 
 def deleteIgnoreError(filename):
     try:
+        print 'Removing %s' % filename
         os.remove(filename)
-    except OSError:
-        pass
+    except OSError,e:
+        print e
