@@ -96,7 +96,8 @@ if __name__ == '__main__':
                 pass
         delta = time.time() - start
         per_thousand = (delta/count) * 1000
-        print "elapsed: %.3f s per_thousand:%.3f" % (delta, per_thousand)
+        per_second = count/delta
+        print "elapsed: %.3f s per_thousand:%.3f per_second:%.3f" % (delta, per_thousand, per_second)
     except Exception, e:
         print 'Main loop exception ', e
         traceback.print_exc()
