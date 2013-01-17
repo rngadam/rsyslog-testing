@@ -7,6 +7,7 @@ from subprocess import *
 import fcntl, os
 import signal
 import time
+import syslog
 
 class Rsyslog:
     def __init__(
@@ -39,7 +40,7 @@ class Rsyslog:
         print(' '.join(params))
         self.process = Popen(
             params, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
-        #fcntl.fcntl(self.process.stdout.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
+
 
     def stop(self):
         if self.process:
@@ -58,21 +59,24 @@ class Rsyslog:
 
 def waitOutput(stream, str, timeout=5, echo=False):
     #print("LOOKING FOR %s" % str)
+    fcntl.fcntl(stream.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
     lastLine = None
     start = time.time()
+    buf = ""
     while time.time() - start < timeout:
         try:
             line = stream.readline().strip()
             if len(line) > 0:
                 if echo:
                     print(line)
+                buf = buf + line
                 lastLine = line
             else:
                 continue
         except IOError:
             continue
 
-        if line.find(str) != -1:
+        if buf.find(str) != -1:
             #print ("FOUND %s" % str)
             return
 
@@ -120,13 +124,14 @@ class TestRsyslogRELP(unittest.TestCase):
 
     def test_message_sending(self):
         print>>self.input, 'test_message_sending'
-        waitOutput(self.output, 'test_message_sending', timeout=10, echo=True)
+        self.input.flush()
+        waitOutput(self.output, 'test_message_sending', timeout=15, echo=True)
 
     def skip_test_message_send_shutdown_resume(self):
         self.server.stop()
         print>>self.input, 'test_message_send_shutdown_resume'
         self.server.start()
-        waitOutput(self.output, 'test_message_send_shutdown_resume')
+        waitOutput(self.output, 'test_message_send_shutdown_resume', timeout=15, echo=True)
 
 
 if __name__ == '__main__':
