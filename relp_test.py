@@ -48,7 +48,11 @@ class Rsyslog:
                 print("Already stopped")
             else:
                 self.process.send_signal(signal.SIGINT)
-                self.waitOutput('Clean shutdown completed, bye')
+                try:
+                    self.waitOutput('Clean shutdown completed, bye')
+                except:
+                    self.process.send_signal(signal.SIGKILL)
+
             self.process = None
         else:
             raise Exception('Not started!')
@@ -125,13 +129,17 @@ class TestRsyslogRELP(unittest.TestCase):
     def test_message_sending(self):
         print>>self.input, 'test_message_sending'
         self.input.flush()
-        waitOutput(self.output, 'test_message_sending', timeout=15, echo=True)
+        waitOutput(
+            self.output, 'test_message_sending', timeout=5, echo=True)
 
-    def skip_test_message_send_shutdown_resume(self):
+    def test_message_send_shutdown_resume(self):
         self.server.stop()
         print>>self.input, 'test_message_send_shutdown_resume'
+        self.input.flush()
         self.server.start()
-        waitOutput(self.output, 'test_message_send_shutdown_resume', timeout=15, echo=True)
+        waitOutput(
+            self.output, 'test_message_send_shutdown_resume',
+            timeout=5, echo=True)
 
 
 if __name__ == '__main__':
