@@ -86,11 +86,13 @@ def waitOutput(stream, str, timeout=5, echo=False):
 
     raise Exception("Timeout waiting for %s... last line read: %s" % (str, lastLine))
 
+
 def deleteIgnoreError(filename):
     try:
         os.remove(filename)
     except OSError:
         pass
+
 
 class TestRsyslogRELP(unittest.TestCase):
     INPUT_FILE = "/tmp/imfile"
