@@ -12,15 +12,15 @@ from logging.handlers import SysLogHandler
 import socket
 
 class TestRsyslogTopology:
-    OUTPUT_FILE = "/tmp/rsyslog-testing/server.log"
-    QUEUE = "/tmp/rsyslog-testing/srvrfwd.00000001"
-    QI = "/tmp/rsyslog-testing/srvrfwd.qi"
-
+    BASE_DIR = "/tmp/rsyslog-testing"
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+    OUTPUT_FILE = "%s/server.log" % BASE_DIR
+    QUEUE = "%s/srvrfwd.00000001" % BASE_DIR
+    QI = "%s/srvrfwd.qi" % BASE_DIR
+
     SERVER_CONF = CURRENT_DIR + '/server3.conf'
     CLIENT_CONF = CURRENT_DIR + '/client3.conf'
-
-    uid = 0
 
     def setUp(self):
         # start client
@@ -28,6 +28,7 @@ class TestRsyslogTopology:
         rsyslog.deleteIgnoreError(self.OUTPUT_FILE)
         rsyslog.deleteIgnoreError(self.QUEUE)
         rsyslog.deleteIgnoreError(self.QI)
+        rsyslog.mkdirIgnoreError(self.BASE_DIR)
 
         self.output = open(self.OUTPUT_FILE, 'w+')
 
@@ -40,8 +41,10 @@ class TestRsyslogTopology:
         self.client.waitOutput('worker IDLE, waiting for work')
 
     def tearDown(self):
-        self.client.stop()
-        self.server.stop()
+        if 'client' in self:
+            self.client.stop()
+        if 'server' in self:
+            self.server.stop()
 
     def readLogs(self):
         try:

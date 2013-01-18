@@ -88,3 +88,10 @@ def deleteIgnoreError(filename):
         os.remove(filename)
     except OSError,e:
         print e
+
+def mkdirIgnoreError(directory):
+    try:
+        print 'Creating %s' % directory
+        os.mkdir(directory)
+    except OSError,e:
+        print e
