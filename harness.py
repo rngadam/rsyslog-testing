@@ -18,6 +18,14 @@ class RsyslogHarness:
         self.server = None
 
     def setUp(self):
+        print "Instantiating"
+        self.server = rsyslog.Rsyslog(self.config)
+
+        print "Checking configuration"
+        rc = self.server.check()
+        if rc:
+            raise "Failed configuration check: %d" % rc
+
         print "Cleaning up environment"
         #rsyslog.deleteIgnoreError(self.logFile)
         rsyslog.deleteIgnoreError(self.queue)
@@ -27,10 +35,13 @@ class RsyslogHarness:
         self.output = open(self.logFile, 'w+')
 
         print "Starting rsyslogd with config %s" % self.baseName
-        self.server = rsyslog.Rsyslog(self.config)
+
         self.server.start()
         self.server.waitOutput('worker IDLE, waiting for work')
         print "Started rsyslogd with config %s" % self.baseName
+        self.server.process.stdout.close()
+        self.server.process.stderr.close()
+        self.server.process.stdin.close()
 
     def tearDown(self):
         print "Shutting down rsyslogd with config %s" % self.baseName
@@ -42,8 +53,8 @@ class RsyslogHarness:
         try:
             if self.server.process.returncode:
                 print 'server exited with %d' % self.server.process.returncode
-            output = self.server.process.stdout.read()
-            print '%s: %s' % (self.config, output),
+            #output = self.server.process.stdout.read()
+            #print '%s' % output,
         except Exception,e:
             if not hasattr(e, 'errno') or e.errno != 11:
                 print e

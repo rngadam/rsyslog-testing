@@ -8,15 +8,31 @@ class Rsyslog:
     def __init__(
             self,
             configFilename,
-            rsyslogd='/usr/sbin/rsyslogd'):
+            rsyslogd='/usr/sbin/rsyslogd',
+            tmpDir='/tmp/rsyslog-testing'):
         self.configFilename = configFilename
         self.rsyslogd = rsyslogd
-        self.pid = '/tmp/rsyslog-testing/' + os.path.basename(configFilename) + '.pid'
+        self.pid = os.path.join(tmpDir, os.path.basename(configFilename) + '.pid')
         try:
             os.remove(self.pid)
         except OSError,e:
             print e
         self.process = None
+
+    def check(self):
+        params = [
+                self.rsyslogd,
+                '-c5',
+                '-f',
+                self.configFilename,
+                '-N1',
+                '-dn',
+            ]
+        print " ".join(params)
+        rc = call(params)
+        if rc: # non-zero return code == error
+            raise Exception("Failed configuration check: %d" % rc)
+
 
     def start(self):
         if self.process:
@@ -53,16 +69,18 @@ class Rsyslog:
             raise Exception('Not started!')
 
     def waitOutput(self, str, timeout=5):
-        waitOutput(self.process.stdout, str, timeout)
+        waitOutput(self.process, self.process.stdout, str, timeout)
 
 
-def waitOutput(stream, str, timeout=5, echo=False):
+def waitOutput(process, stream, str, timeout=5, echo=False):
     #print("LOOKING FOR %s" % str)
     fcntl.fcntl(stream.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
     lastLine = None
     start = time.time()
     buf = ""
     while time.time() - start < timeout:
+        if process.returncode:
+            raise Exception('Unexpected premature return %d', process.returncode)
         try:
             line = stream.readline().strip()
             if len(line) > 0:
